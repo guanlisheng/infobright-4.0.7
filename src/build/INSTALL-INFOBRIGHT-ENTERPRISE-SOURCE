@@ -1,0 +1,91 @@
+Infobright Installation Using a Source Distribution
+===================================================
+
+Tools required to compiles Infobright source code:
+
+   * A working gcc compiler (version is 4.2.x, 4.3.x, 4.4.x).
+   * Properly installed autoconf and other gnu tools such as aclocal, autoheader, libtool(1.5.22), automake, 
+     autoconf (2.59), autoreconf (2.59), make (3.81), m4 - macro preprocessor(1.4.5), libncurses5, libncurses5-dev, zlib, 
+     zlib-devel, perl, bison etc.
+   * We encountered some issues on redhat 6.1 and debain 6.0.4 during infobright source compilation. Please see section related to redhat and debain.
+   * boost 1.42 or higher (required boost-regex*, boost-program-options*,
+     boost_thread*, boost_filesystem*, boost_system*). In Infobright we compile boost using the following steps
+     - download boost 1.42 and unpack it
+     wget http://softlayer.dl.sourceforge.net/project/boost/boost/1.42.0/boost_1_42_0.tar.gz
+     - cd to unpacked folder
+     - ./bootstrap.sh --prefix=/usr/local/boost_1_42_0
+     - ./bjam install
+     
+Source Installation Overview
+----------------------------
+
+    shell> check out source code (trunk or a branch) from svn
+    shell> cd trunk
+    shell> export BOOST_ROOT=/usr/local/boost_1_42_0
+    
+    To build statically linked binaries
+    -----------------------------------
+    shell> make EDITION=enterprise VERBOSE=yes  LINK_MODE=static release -j4
+    shell> mkdir /usr/local/infobright
+    	Note: you may need super user access to create this folder inside /usr/local/
+    shell> chown -R userid:usergroup /usr/local/infobright
+    	Note: replace userid, usergroup with current user id/group 
+    shell> make EDITION=enterprise install-release
+    shell> cp src/build/pkgmt/my-ib.cnf.in /etc/my-ib.cnf
+    shell> Edit /etc/my-ib.cnf and set 
+    	port 5029, 
+    	socket /tmp/mysql-ib.sock
+    	basedir /usr/local/infobright
+    	datadir /usr/local/infobright/data
+    shell> cd /usr/local/infobright
+    shell> bin/mysql_install_db --defaults-file=/etc/my-ib.cnf --user=userid
+    shell> chown -R mrahman . data cache
+    shell> chgrp -R usergroup .
+    shell> `pwd`/libexec/mysqld --defaults-file=/etc/my-ib.cnf --user=userid --console
+    
+    In another console
+    shell>cd /usr/local/infobright
+    shell>bin/mysql -uroot --port=5029 test
+    mysql> show databases;
+    mysql> create table t1(a int)engine=brighthouse;
+    mysql> select *from t1;
+    mysql> insert into t1 values(1);
+    mysql> select *from t1;
+    
+	To build dynamically linked binaries
+	------------------------------------
+	
+	shell> make EDITION=enterprise VERBOSE=yes  release -j4
+		    
+Notes compilation on redhat 6.1
+-------------------------------------
+	To build dynamically linked binaries: Install all the tools (mentioned at the begining) and follow the compilation steps.
+	
+	To build statically linked binaries: 
+	- Download glibc 2.12.1 source tar and unpack it.
+	- mkdir glibc-build
+	- cd glibc-build
+	- ../glibc-2.12.1/configure --prefix=/home/user/glibc
+	- make install
+	- Backup /usr/lib64/lib*.a, copy  /home/user/glibc/lib*.a files to /usr/lib64/
+	- download zlib source code and compile. Copy libz.a to /usr/lib64/
+	- download and compile libncurses source code. Copy libncurses*.a to /usr/lib64
+	- Download boost library and compile it.
+	- Follow compile steps. 
+	    shell> cd trunk
+    	shell> export BOOST_ROOT=/usr/local/boost_1_42_0
+	    shell> make EDITION=enterprise VERBOSE=yes  LINK_MODE=static release -j4
+	    shell> ...
+	 
+Notes compilation on debian 6.0.4
+-------------------------------------
+	 - Install all the necessary dev tools 
+	 - remove autoconf2.13 at it may be installed automatically while installing dev tools
+	 autoconf2.13 gives some error on infobright source compilation.
+	 apt-get remove autoconf2.13
+	 - Download boost library and compile it.
+	 - Follow compilation steps
+	    shell> cd trunk
+    	shell> export BOOST_ROOT=/usr/local/boost_1_42_0
+	    shell> make EDITION=enterprise VERBOSE=yes  LINK_MODE=static release -j4
+	    shell> ...

@@ -1,0 +1,4 @@
+"IPv4","PREDEFINED",""
+"IPv4_C","%d.%d.%d.%d",""
+"EMAIL","%s@%s",""
+"URL","%s://%s?%s",""

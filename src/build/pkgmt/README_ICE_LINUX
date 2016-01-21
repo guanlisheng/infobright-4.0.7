@@ -1,0 +1,107 @@
+
+You can view the latest version of the Install Guide at:
+http://www.infobright.org/wiki/Install_Guide/
+
+Installation instructions:
+
+1. Download the package infobright-version-arch.tar.gz to the server where you are installing Infobright
+
+2. Obtain root user access
+
+3. Change to the parent location in which you want to install (e.g. /usr/local) 
+   cd /usr/local
+
+4. Unpack the tarball, which will create the product directory (infobright-version-arch/), and create a symbolic link 'infobright' to the product folder
+
+   gunzip < /path/to/infobright-version-arch.tar.gz | tar xvf -
+   ln -s /usr/local/infobright-version-arch infobright
+   cd infobright/
+
+5. Run the install script with the "--help" flag to check for system configuration and provide examples of directory parameters
+
+   ./install-infobright.sh --help
+
+   Parameters required-
+   --datadir=infobright data folder  [--datadir=/usr/local/infobright/data]
+   --cachedir=infobright cache folder  [--cachedir=/usr/local/infobright/cache]
+   --config=mysql conf file to be created  [--config=/etc/my-ib.cnf]
+   --port=infobright server port  [--port=5029]
+   --socket=socket file to be used by this server  [--socket=/tmp/mysql-ib.sock]
+   --user=user to be created if not exist  [--user=mysql]
+   --group=user group be created if not exist  [--group=mysql]
+
+   Infobright Command Line Parameters:
+
+   Datadir - Path to the directory where tables will be created and stored. Use a high-performance storage such as a RAID.
+   Cachedir - Path to the directory where temporary files will be created and stored. Should be located on a fast drive, possibly not the same as the data. Allow at least 100 GB of free space (depending on database size).
+   Port - Listening port for the Infobright server instance.
+   Config - MySQL configuration file. (The configuration file will be created with defaults during the Infobright installation.)
+   Socket - Socket connection point for client connections. (The socket connection point will be created during the Infobright installation.)
+   User - System user who can run the infobright server instance. User will be be created if it does not exist. The default user is mysql.
+   Group - System group for the above user. Group will be be created if it does not exist. The default group is mysql.
+
+6. Run the install script again, this time with directory parameters. If parameters are used that already exist, an error will occur (for example running the same script with parameters twice)
+
+   Example command
+   ./install-infobright.sh          (install with defaults)
+   ./install-infobright.sh --help
+   ./install-infobright.sh --force  (bypass system compatibility checking)
+   ./install-infobright.sh --datadir=/usr/local/infobright/data \
+--cachedir=/usr/local/infobright/cache --port=5029 --config=/etc/my-ib.cnf --socket=/tmp/mysql-ib.sock \
+--user=mysql --group=mysql --force
+
+7. Change default memory configuration by editing the file brighthouse.ini within the data directory. The following table lists the parameters and some recommended values based on the amount of system memory (values are expressed in megabytes).
+
+   System  Server Main   Loader Main
+   Memory  Heap Size     Heap Size   
+   -------------------------------------
+   32 GB    24000         800   
+   16 GB    10000         800   
+    8 GB     4000         800  
+
+   Note: The default values are set to the application minimum allowed values of 600, 250, and 320 respectively, and performance may be impacted. 
+
+   The 32-bit install is also set to the minimum allowed values of 600, 250, and 320 respectively.
+
+8. To manually start the Infobright server, change to user root or mysql and run:
+
+   cd /usr/local/infobright
+   bin/mysqld_safe --defaults-file=/etc/my-ib.cnf [--user=mysql] [&]
+
+   For details, run
+
+   bin/mysqld_safe --help
+
+   To stop the Infobright server, run
+   /usr/local/infobright/bin/mysqladmin --defaults-file=/etc/my-ib.cnf -uroot shutdown
+
+9. To start/stop the Infobright server during system boot/shutdown use the mysqld-ib script in /etc/init.d/ for start and stop services. Use run level 2 3 4 5 to start the service, and run level 0 1 6 to stop.
+
+   The following are sample commands to create services:
+
+   (Ubuntu/Debian) update-rc.d mysqld-ib start 99 2 3 4 5 . stop 01 0 1 6 .
+   (CentOS/Redhat) chkconfig --add mysqld-ib
+            chkconfig --level 2345 mysqld-ib on
+            chkconfig --level 016 mysqld-ib off
+
+   This script can also be used to start/stop the server anytime by running the command itself.
+
+   /etc/init.d/mysqld-ib start
+   /etc/init.d/mysqld-ib stop
+ 
+10. To connect to Infobright server, use the script mysql-ib located in /usr/bin 
+
+		Upgrade Note
+___________________________________________________________
+With 3.4.2 GA, several tuning parameters have been deprecated from the brighthouse.ini file.
+
+The deprecated parameters include:
+   ServerCompressedHeapSize
+   LoaderSaveThreadNumber
+   BufferingLevel
+   CachingLevel
+   ClusterSize
+   HugefileDir
+
+Setting ControlMessages=4 in the brighthouse.ini will print the confguration settings to log
+file.

@@ -1,0 +1,9 @@
+MYSQL_STORAGE_ENGINE(brighthouse,,  [BrightHouse Storage Engine],
+        [Highly-compressed storage engine])
+MYSQL_PLUGIN_STATIC(brighthouse,        [libbrighthouse.a])
+MYSQL_PLUGIN_MANDATORY(brighthouse)
+#MYSQL_PLUGIN_ACTIONS(brighthouse,  [
+#  AC_CONFIG_FILES(
+#      storage/brighthouse/handler/Makefile)
+#  ])
+#MYSQL_PLUGIN_DEPENDS_ON_MYSQL_INTERNALS(brighthouse, [BrighthouseHandler.cpp])

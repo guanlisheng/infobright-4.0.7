@@ -1,0 +1,309 @@
+$(foreach DIR,$(subst /, ,$(CURDIR)), $(eval $(eval DIR_ROOT_TEST=$(DIR_ROOT_TEST)/$(DIR)) $(if $(wildcard $(DIR_ROOT_TEST)/src/configure.ac),export DIR_ROOT ?= $(DIR_ROOT_TEST))))
+VPATH=$(DIR_ROOT)
+
+COMA=,
+ifeq ($(VERBOSE),yes)
+	invoke = echo "$(1)$(2)$(3)$(4)$(5)$(6)$(7)$(8)$(9)$(10)$(11)$(12)$(13)$(14)$(15)$(16)" && $(1)$(2)$(3)$(4)$(5)$(6)$(7)$(8)$(9)$(10)$(11)$(12)$(13)$(14)$(15)$(16)
+	msg =
+else
+	invoke = $(1)$(2)$(3)$(4)$(5)$(6)$(7)$(8)$(9)$(10)
+	msg = $(1)$(2)$(3)$(4)$(5)$(6)$(7)$(8)$(9)$(10)
+endif
+ifeq ($(TERMINAL),TERM)
+	CL   := $(shell tput cr;tput dl1)
+	BOLD := $(shell tput bold || tput md)
+	RED  := $(shell tput setaf 1 || tput AF 1)
+	RS   := $(shell tput sgr0 || tput me)
+	NONL := "-n"
+endif
+
+DIR_DEST=@prefix@/libexec/
+CXX?=@CXX@
+DXX=@CXX@
+AR = @AR@
+RANLIB = @RANLIB@
+# @MKDIR_P@ # Centos is so outdated that its version of autoconf does not support AC_PROG_MKDIR_P macro.
+MKDIR_P = mkdir -p 
+INSTALL = @INSTALL@
+ARFLAGS = cru
+BOOST_LIBS = @BOOST_LDFLAGS@ @BOOST_FILESYSTEM_LIB@ @BOOST_PROGRAM_OPTIONS_LIB@ @BOOST_REGEX_LIB@ @BOOST_SYSTEM_LIB@ @BOOST_THREAD_LIB@
+ALL_STATIC = @ALL_STATIC@
+DETECT_MACHINE_TYPE=$(shell uname -m)
+SOLARISINDICATOR=i86pc
+ifeq ($(findstring $(SOLARISINDICATOR),$(DETECT_MACHINE_TYPE)),$(SOLARISINDICATOR))
+ALL_STATIC=
+endif
+
+CXXFLAGS+= @CXXFLAGS@ @CXXFLAGS_BH_PRIVATE@ @BOOST_CPPFLAGS@ \
+					 @CXX_WARN_MISSING_INCLUDE_DIRS@ @PATH_BOOST_INCLUDES@ \
+					 @DEFS@ @BH_EDITION_FLAGS@ \
+					 -DMYSQL_SERVER \
+					 -I. -I$(DIR_ROOT)/$(DIR_SRC) -I$(DIR_ROOT)/$(DIR_SRC)/@DIR_EDITION@ -I../.. -I$(DIR_ROOT)/vendor/mysql/include \
+					 -I$(DIR_ROOT)/build/$(EDITION)/@TARGET@/vendor/include -I$(DIR_ROOT)/vendor/mysql/sql \
+					 -I$(DIR_ROOT)/vendor/mysql/regex
+
+CXXLDFLAGS=@CXXLDFLAGS@ @IB_WRAPPER_LDFLAGS@ $(ALL_STATIC)
+
+DIR_MODULE=storage/brighthouse
+
+ifneq ($(EDITION),community)
+DIR_MODULE_dataprocessor=.
+CXXFLAGS_dataprocessor=-DPURE_LIBRARY -DDATA_PROCESSOR
+CXXFLAGS_dataprocessor+= -I$(DIR_ROOT)/vendor/libdrizzle/ -DDRIZZLE_CLIENT
+LIB_EXTERNAL_CLIENTAPI=-L$(DIR_ROOT)/build/$(EDITION)/@TARGET@/libdrizzle/.libs/ -ldrizzle 
+dataprocessor=_dataprocessor
+dataprocessor_D=.d
+endif
+
+ifneq ($(EDITION),community)
+DIR_MODULE_downgrader=.
+downgrader=_downgrader
+downgrader_D=.d
+
+DIR_MODULE_icm=.
+icm=_icm
+icm_D=.d
+endif
+
+DIR_MODULE_chmt=.
+chmt=_chmt
+chmt_D=.d
+
+DIR_SRC=src/$(DIR_MODULE)
+
+DIR_VENDOR = $(DIR_ROOT)/vendor/mysql
+MODULES=core @DIR_EDITION@ common compress util types vc system handler loader exporter domaininject
+
+LIBRARY_PURE = libbrighthouse-pure.a
+LIBRARY = libbrighthouse.a
+LIBRARY_EMBEDDED = libbrighthouse-embedded.a
+TARGETS = mysqld bhloader
+
+ifneq ($(SKIP_CHMT),yes)
+TARGETS += chmt
+endif
+ifneq ($(SKIP_EMBEDDED),yes)
+TARGETS += @WITH_EMBEDDED@
+endif
+ifneq ($(EDITION),community)
+ifneq ($(SKIP_ICM),yes)
+TARGETS+= icm
+endif
+ifneq ($(SKIP_DOWNGRADER),yes)
+TARGETS += downgrader
+endif
+ifneq ($(SKIP_DATAPROCESSOR),yes)
+TARGETS+= dataprocessor
+endif
+endif
+
+VENDOR_LIBSDIR = $(DIR_ROOT)/build/$(EDITION)/@TARGET@/vendor
+
+LIBS= $(VENDOR_LIBSDIR)/libcsv.a $(VENDOR_LIBSDIR)/libheap.a $(VENDOR_LIBSDIR)/libmyisam.a $(VENDOR_LIBSDIR)/libmyisammrg.a \
+			$(VENDOR_LIBSDIR)/libvio.a $(VENDOR_LIBSDIR)/libmysys.a $(VENDOR_LIBSDIR)/libdbug.a \
+			$(VENDOR_LIBSDIR)/libregex.a $(VENDOR_LIBSDIR)/libmystrings.a
+SLIB=$(VENDOR_LIBSDIR)/libsql.a
+MLIB=$(VENDOR_LIBSDIR)/sql/libmysqld.a
+
+CXXFLAGS+= -I$(DIR_ROOT)/vendor/mysql/extra/yassl/taocrypt/include -I$(DIR_ROOT)/vendor/mysql/extra/yassl/taocrypt/mySTL
+LIBS+= $(VENDOR_LIBSDIR)/libyassl.a $(VENDOR_LIBSDIR)/libtaocrypt.a
+
+LIBS:= $(SLIB) $(LIBRARY) $(LIBS)
+LINK_FLAGS=$(LIBS) @LIBS@ @LIBBOOST_FLAGS@ -lz -lrt $(BOOST_LIBS)
+
+LINK_FLAGS_PURE=@LIBS@ @LIBBOOST_FLAGS@ -lz -lrt $(BOOST_LIBS)
+
+SRCS_BHLOADER = $(DIR_SRC)/loader/BHLoaderApp.cpp
+ifneq ($(EDITION),community)
+SRCS_DATAPROCESSOR = $(strip $(sort $(subst $(DIR_ROOT)/,,$(shell find $(DIR_ROOT)/src/dataprocessor -name "*.cpp"))))
+endif
+SRCS_LIBRARY  = $(strip $(sort $(filter-out $(SRCS_BHLOADER),$(subst $(DIR_ROOT)/,,$(foreach MODULE, $(MODULES), $(shell find $(DIR_ROOT)/$(DIR_SRC)/$(MODULE) -name "*.cpp" | grep -v windows))))))
+ifneq ($(EDITION),community)
+SRCS_ICM  	  =	$(strip $(sort $(subst $(DIR_ROOT)/,,$(shell find $(DIR_ROOT)/src/icm -name "*.cpp"))))
+SRCS_DOWNGRADER  = $(strip $(sort $(subst $(DIR_ROOT)/,,$(shell find $(DIR_ROOT)/src/downgrader -name "*.cpp"))))
+endif
+SRCS_CHMT  	  =	$(strip $(sort $(subst $(DIR_ROOT)/,,$(shell find $(DIR_ROOT)/src/chmt -name "*.cpp"))))
+ifneq ($(EDITION),community)
+SRCS_MYSQLTEST_EMBEDDED  = $(lastword $(wildcard $(DIR_ROOT)/vendor/*/client/mysqltest.cc))
+endif
+
+OBJS_LIBRARY  = $(strip $(subst .cpp,.o,$(subst src/,,$(SRCS_LIBRARY))))
+OBJS_LIBRARY_EMBEDDED  = $(strip $(subst .cpp,-embedded.o,$(subst src/,,$(SRCS_LIBRARY))))
+OBJS_LIBRARY_PURE = $(strip $(subst .cpp,-pure.o,$(subst src/,,$(SRCS_LIBRARY))))
+OBJS_BHLOADER = $(strip $(subst .cc,.o,$(subst .cpp,.o,$(subst src/,,$(SRCS_BHLOADER)))))
+ifneq ($(EDITION),community)
+OBJS_DATAPROCESSOR = $(strip $(subst dataprocessor/,dataprocessor.d/,$(subst .cc,.o,$(subst .cpp,.o,$(subst src/,,$(SRCS_DATAPROCESSOR))))))
+endif
+ifneq ($(EDITION),community)
+OBJS_ICM  	  = $(strip $(subst icm/,icm.d/,$(subst .cpp,.o,$(subst src/,,$(SRCS_ICM)))))
+OBJS_DOWNGRADER  = $(strip $(subst downgrader/,downgrader.d/,$(subst .cpp,.o,$(subst src/,,$(SRCS_DOWNGRADER)))))
+endif
+OBJS_CHMT 	  = $(strip $(subst chmt/,chmt.d/,$(subst .cpp,.o,$(subst src/,,$(SRCS_CHMT)))))
+
+DIRS_LIBRARY  = $(sort $(strip $(dir $(OBJS_LIBRARY))))
+DIRS_BHLOADER = $(sort $(strip $(dir $(OBJS_BHLOADER))))
+ifneq ($(EDITION),community)
+DIRS_DATAPROCESSOR = $(sort $(strip $(dir $(OBJS_DATAPROCESSOR))))
+endif
+
+ifneq ($(EDITION),community)
+DIRS_ICM  	  =	$(sort $(strip $(dir $(OBJS_ICM))))
+DIRS_DOWNGRADER  = $(sort $(strip $(dir $(OBJS_DOWNGRADER))))
+endif
+DIRS_CHMT  	  =	$(sort $(strip $(dir $(OBJS_CHMT))))
+
+DIRS=$(DIRS_LIBRARY) $(DIRS_BHLOADER) $(DIRS_DATAPROCESSOR) $(DIRS_DOWNGRADER) $(DIRS_ICM) $(DIRS_CHMT)
+
+define MAKE_DIR
+$(1):
+	  @umask 022;/bin/mkdir -p $(1)
+endef
+
+define IMPLICIT_RULE
+
+$(2)/$(3)/%-embedded.d: $$(DIR_ROOT)/src/$(2)/$(1)/%.cpp
+	@echo -n "." && \
+	/bin/rm -f "$$(@)" && \
+	$$(DXX) $$(CXXFLAGS) -MM $$(<) -MT $$(@:.d=.o) -MT $$(@) -MF $$(@)
+
+$(2)/$(3)/%-embedded.o: $$(DIR_ROOT)/src/$(2)/$(1)/%.cpp
+	@$$(call msg,echo -n "Compiling \`$$(subst $$(DIR_ROOT)/,,$$(<))' ... " && ) \
+	/bin/rm -f "$$(@)" && \
+	$$(call invoke,$$(CXX) $$(CXXFLAGS) -DEMBEDDED_LIBRARY $$(<) -c -o $$(@) 2>&1 | tee -a make.log) && \
+	test -f $$(@) \
+	$$(call msg,&& echo $$(NONL) "done.$$(CL)")
+
+$(2)/$(3)/%-pure.d: $$(DIR_ROOT)/src/$(2)/$(1)/%.cpp
+	@echo -n "." && \
+	/bin/rm -f "$$(@)" && \
+	$$(DXX) $$(CXXFLAGS) -MM $$(<) -MT $$(@:.d=.o) -MT $$(@) -MF $$(@)
+	
+$(2)/$(3)/%-pure.o: $$(DIR_ROOT)/src/$(2)/$(1)/%.cpp
+	@$$(call msg,echo -n "Compiling \`$$(subst $$(DIR_ROOT)/,,$$(<))' ... " && ) \
+	/bin/rm -f "$$(@)" && \
+	$$(call invoke,$$(CXX) $$(CXXFLAGS) -DPURE_LIBRARY -DDATA_PROCESSOR $$(<) -c -o $$(@) 2>&1 | tee -a make.log) && \
+	test -f $$(@) \
+	$$(call msg,&& echo $$(NONL) "done.$$(CL)")
+
+$(2)/$(3)/%.d: $$(DIR_ROOT)/src/$(2)/$(1)/%.cpp
+	@echo -n "." && \
+	/bin/rm -f "$$(@)" && \
+	$$(DXX) $$(CXXFLAGS) -MM $$(<) -MT $$(@:.d=.o) -MT $$(@) -MF $$(@)
+
+$(2)/$(3)/%.o: $$(DIR_ROOT)/src/$(2)/$(1)/%.cpp
+	@$$(call msg,echo -n "Compiling \`$$(subst $$(DIR_ROOT)/,,$$(<))' ... " && ) \
+	/bin/rm -f "$$(@)" && \
+	$$(call invoke,$$(CXX) $$(CXXFLAGS) $$(CXXFLAGS_$(1)) $$(<) -c -o $$(@) 2>&1 | tee -a make.log) && \
+	test -f $$(@) \
+	$$(call msg,&& echo $$(NONL) "done.$$(CL)")
+
+endef
+
+.PHONY: all clean install
+
+all: $(TARGETS) cp_app
+
+$(foreach MODULE,$(MODULES) mysql dataprocessor downgrader icm chmt,$(eval $(call IMPLICIT_RULE,$(MODULE),$(DIR_MODULE$($(MODULE))),$(MODULE)$($(MODULE)_D))))
+$(foreach DIR,$(sort $(DIRS)),$(eval $(call MAKE_DIR,$(DIR))))
+
+mysqld: $(MLIB) $(LIBS)
+	@$(call msg,echo -n "Linking $(@) ... " && ) \
+	$(call invoke,$(CXX) $(CXXFLAGS) $(CXXLDFLAGS) $(MLIB) $(LINK_FLAGS) -o $(@) 2>&1 | tee -a make.log) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+
+bhloader: mysqld $(DIRS_BHLOADER) $(LIBS) $(OBJS_BHLOADER)
+	@$(call msg,echo -n "Linking $(@) ... " && ) \
+	$(call invoke,$(CXX) $(CXXFLAGS) $(CXXLDFLAGS) -z muldefs $(OBJS_BHLOADER) $(LIBRARY) $(MLIB) $(LINK_FLAGS) -o $(@) 2>&1 | tee -a make.log) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+
+ifneq ($(EDITION),community)
+dataprocessor: $(DIRS_DATAPROCESSOR) $(LIBRARY_PURE) $(OBJS_DATAPROCESSOR)
+	@$(call msg,echo -n "Linking $(@) ... " && ) \
+	$(call invoke,$(CXX) $(CXXFLAGS) $(CXXLDFLAGS) -z muldefs $(OBJS_DATAPROCESSOR) -L$(VENDOR_LIBSDIR) $(LIBRARY_PURE) $(LIB_EXTERNAL_CLIENTAPI) $(LINK_FLAGS_PURE) -ltaocrypt -lyassl -o $(@) 2>&1 | tee -a make.log) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+endif
+
+ifneq ($(EDITION),community)
+icm: chmt $(DIRS_ICM) $(LIBS) $(OBJS_ICM)
+	@$(call msg,echo -n "Linking $(@) ... " && ) \
+	$(call invoke,$(CXX) $(CXXFLAGS) $(CXXLDFLAGS) -z muldefs $(OBJS_ICM) $(LIBRARY) $(MLIB) $(LINK_FLAGS) $(LIBRARY) -o $(@) 2>&1 | tee -a make.log) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+
+downgrader: bhloader $(DIRS_DOWNGRADER) $(LIBS) $(OBJS_DOWNGRADER)
+	@$(call msg,echo -n "Linking $(@) ... " && ) \
+	$(call invoke,$(CXX) $(CXXFLAGS) $(CXXLDFLAGS) -z muldefs $(OBJS_DOWNGRADER) $(LIBRARY) $(MLIB) $(LINK_FLAGS) $(LIBRARY) -o $(@) 2>&1 | tee -a make.log) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+endif
+
+chmt: bhloader $(DIRS_CHMT) $(LIBS) $(OBJS_CHMT)
+	@$(call msg,echo -n "Linking $(@) ... " && ) \
+	$(call invoke,$(CXX) $(CXXFLAGS) $(CXXLDFLAGS) -z muldefs $(OBJS_CHMT) $(LIBRARY) $(MLIB) $(LINK_FLAGS) $(LIBRARY) -o $(@) 2>&1 | tee -a make.log) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+
+$(LIBRARY): $(DIRS_LIBRARY) $(OBJS_LIBRARY)
+	@$(call msg,echo -n "Preparing library $(@) ... " && ) \
+	/bin/rm -f "$(@)" && \
+	$(call invoke,$(AR) $(ARFLAGS) $(LIBRARY) $(OBJS_LIBRARY)) && \
+	$(call invoke,$(RANLIB) $(LIBRARY)) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+
+$(LIBRARY_EMBEDDED): $(LIBRARY) $(DIRS_LIBRARY) $(OBJS_LIBRARY_EMBEDDED)
+	@$(call msg,echo -n "Preparing library $(@) ... " && ) \
+	/bin/rm -f "$(@)" && \
+	$(call invoke,$(AR) $(ARFLAGS) $(@) $(OBJS_LIBRARY_EMBEDDED)) && \
+	$(call invoke,$(RANLIB) $(@)) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+
+ifneq ($(EDITION),community)
+mysqltest_embedded: $(LIBRARY_EMBEDDED)
+	@$(call msg,echo -n "Building $(@) ... " && ) \
+	$(call invoke,$(CXX) $(CXXFLAGS) $(filter-out -all-static,$(CXXLDFLAGS)) -DEMBEDDED_LIBRARY -z muldefs $(SRCS_MYSQLTEST_EMBEDDED) $(LIBRARY_EMBEDDED) $(VENDOR_LIBSDIR)/libmysqld/libmysqld.a $(subst brighthouse,brighthouse-embedded,$(LINK_FLAGS)) $(LIBRARY_EMBEDDED) -o $(@) 2>&1 | tee -a make.log) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+endif
+
+ifneq ($(EDITION),community)
+$(LIBRARY_PURE): $(DIRS_LIBRARY) $(OBJS_LIBRARY_PURE)
+	@$(call msg,echo -n "Preparing library $(@) ... " && ) \
+	/bin/rm -f "$(@)" && \
+	$(call invoke,$(AR) $(ARFLAGS) $(LIBRARY_PURE) $(OBJS_LIBRARY_PURE)) && \
+	$(call invoke,$(RANLIB) $(LIBRARY_PURE)) && \
+	test -f $(@) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+endif
+clean:
+	@/bin/rm -f $(OBJS_LIBRARY)
+
+cp_app: $(TARGETS)
+	if [ "x${BUILD_MODE}" != "xfast" ] ; then \
+	cp -f mysqld bhloader chmt ../vendor/sql ;\
+	[ -f icm ] && cp icm ../vendor/sql/ ; \
+	[ -f downgrader ] && cp downgrader ../vendor/sql/ ; \
+	[ -f $(LIBRARY_EMBEDDED) ] && cp -f $(LIBRARY_EMBEDDED) ../vendor/libmysqld/ ; \
+	echo "copied" ; \
+	fi
+
+install:
+	@$(call msg,echo -n "Installing files $(TARGETS) ... " && ) \
+	$(MKDIR_P) $(DIR_DEST) && $(INSTALL) $(TARGETS) $(DIR_DEST) \
+	$(call msg,&& echo $(NONL) "done.$(CL)")
+
+OBJS=$(OBJS_LIBRARY) $(OBJS_BHLOADER) $(OBJS_DOWNGRADER) $(OBJS_ICM) $(OBJS_CHMT) $(OBJS_LIBRARY_PURE) $(OBJS_LIBRARY_EMBEDDED)
+$(firstword $(sort $(OBJS_LIBRARY:.o=.d))) $(lastword $(OBJS_LIBRARY:.o=.d)) $(firstword $(OBJS_LIBRARY_EMBEDDED:.o=.d)) $(lastword $(OBJS_LIBRARY_EMBEDDED:.o=.d)) $(firstword $(OBJS_LIBRARY_PURE:.o=.d)) $(lastword $(OBJS_LIBRARY_PURE:.o=.d)) $(firstword $(OBJS_BHLOADER:.o=.d)) $(lastword $(OBJS_BHLOADER:.o=.d)) $(firstword $(OBJS_DOWNGRADER:.o=.d)) $(lastword $(OBJS_DOWNGRADER:.o=.d)) $(firstword $(OBJS_ICM:.o=.d)) $(lastword $(OBJS_ICM:.o=.d)) $(firstword $(OBJS_CHMT:.o=.d)) $(lastword $(OBJS_CHMT:.o=.d)): dirs.d
+
+dirs.d:
+	@mkdir -p $(DIRS) && touch $(@)
+
+ifneq ($(findstring $(SOLARISINDICATOR),$(DETECT_MACHINE_TYPE)),$(SOLARISINDICATOR))
+-include $(OBJS:.o=.d)
+endif
+
+# vim:ts=2
