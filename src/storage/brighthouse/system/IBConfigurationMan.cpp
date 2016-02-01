@@ -308,7 +308,7 @@ void IBConfigurationManager::PublishElementsToShowVar()
 	bh_sysvar_bufferinglevel = GetValueInt("brighthouse/bufferinglevel", error);
 
 	bh_sysvar_mm_policy = const_cast<char *>(GetValueString("brighthouse/memorymanagement/policy", error).c_str());
-	bh_sysvar_mm_hardlimit = GetValueInt("brighthouse/memorymanagement/", error);
+	bh_sysvar_mm_hardlimit = GetValueInt("brighthouse/memorymanagement/hardlimit", error);
 	bh_sysvar_mm_releasepolicy = const_cast<char *>(GetValueString("brighthouse/memorymanagement/releasepolicy", error).c_str());
 	bh_sysvar_mm_largetempratio = GetValueInt("brighthouse/memorymanagement/largetempratio", error);
 
